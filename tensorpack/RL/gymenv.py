@@ -34,7 +34,10 @@ class GymEnv(RLEnvironment):
             self.gymenv = gym.make(name)
         if dumpdir:
             mkdir_p(dumpdir)
-            self.gymenv = gym.wrappers.Monitor(self.gymenv, dumpdir)
+            def video_callable(ep_id):
+                print('DR FORD: recording video for', ep_id)
+                return True
+            self.gymenv = gym.wrappers.Monitor(self.gymenv, dumpdir, video_callable=video_callable, uid='_')
         self.use_dir = dumpdir
 
         self.reset_stat()
