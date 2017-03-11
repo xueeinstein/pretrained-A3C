@@ -84,15 +84,19 @@ def do_submit(output):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
-    parser.add_argument('--load', help='load model', required=True)
-    parser.add_argument('--env', help='environment name', required=True)
-    parser.add_argument('--episode', help='number of episodes to run',
-                        type=int, default=100)
-    parser.add_argument('--output', help='output directory', default='gym-submit')
+    parser.add_argument('env', help='environment name')
+    parser.add_argument('-g', '--gpu', help='comma separated list of GPU(s) to use.')
+    parser.add_argument('--load', help='pretrained model directory', default='pretrained')
+    parser.add_argument('-e', '--episode', help='number of episodes to run',
+                        type=int, default=20)
+    parser.add_argument('--output', help='output directory', default='~/Video')
     args = parser.parse_args()
+    
+    env=args.env
+    ENV_NAME = '{}-v0'.format(env)
+    args.load = os.path.expanduser('{}/{}.tfmodel'.format(args.load, ENV_NAME))
+    args.output = os.path.expanduser(os.path.join(args.output, env))
 
-    ENV_NAME = args.env
     assert ENV_NAME
     logger.info("Environment Name: {}".format(ENV_NAME))
     p = get_player()
