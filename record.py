@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import subprocess as pc
 
-EPISODES = 50
+EPISODES = 10
 NUM_GPUS = 8
 LOAD_DIR = 'pretrained'
 VIDEO_DIR = '~/Video'
@@ -15,7 +15,7 @@ for g in games:
 
 gpu = 0
 for game in games:
-    cmd = ('examples/A3C-Gym/run-atari.py {} -g {} -e {} --load {} --output {}'
+    cmd = ('examples/A3C-Gym/visualize-atari.py {} -g {} -e {} --load {} --output {}'
            .format(game, gpu, EPISODES, LOAD_DIR, VIDEO_DIR))
     print('GPU', gpu, '>>>', cmd)
     pc.Popen(cmd, shell=True)
