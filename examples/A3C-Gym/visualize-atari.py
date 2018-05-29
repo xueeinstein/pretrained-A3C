@@ -76,7 +76,7 @@ def play_one_episode(player, func, video_writer, verbose=False,
         act, vam = func([[s]])
         act = act[0][0].argmax()
         vam = vam[0]
-        ob = cv2.resize(np.uint8(s[:, :, -3:] * 255),
+        ob = cv2.resize(np.uint8(s[:, :, -3:][..., ::-1]),
                         (vam.shape[1], vam.shape[0]))
         ob_fusion = fusion_alpha * vam + (1 - fusion_alpha) * ob
         ob_fusion = np.uint8(ob_fusion)
