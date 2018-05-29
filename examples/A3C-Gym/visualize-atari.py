@@ -82,7 +82,7 @@ def play_one_episode(player, func, video_writer, verbose=False,
         ob_fusion = np.uint8(ob_fusion)
         # cv2.imshow("fusion", ob_fusion)
         # cv2.waitKey(0)
-        video_writer.add_frame(ob_fusion)
+        video_writer.add_frame(np.concatenate((ob, ob_fusion), axis=1))
         if random.random() < 0.001:
             act = spc.sample()
         if verbose:
@@ -203,7 +203,7 @@ def run_submission(cfg, output, nr):
         if k != 0:
             player.restart_episode()
         vis_video = os.path.join(output, "ep_{}.mp4".format(k))
-        video_writer = MovieWriter(vis_video, (ob_shape[1], ob_shape[0]), 8)
+        video_writer = MovieWriter(vis_video, (ob_shape[1] * 2, ob_shape[0]), 8)
         score = play_one_episode(player, predfunc, video_writer)
         video_writer.close()
         print("Score:", score)
