@@ -20,6 +20,7 @@ IMAGE_SHAPE3 = IMAGE_SIZE + (CHANNEL,)
 
 NUM_ACTIONS = None
 ENV_NAME = None
+t_episode = 0
 
 
 def normalize_activation(act, ubound=1.0, eps=1e-7):
@@ -82,7 +83,11 @@ def play_one_episode(player, func, video_writer, verbose=False,
         ob_fusion = np.uint8(ob_fusion)
         # cv2.imshow("fusion", ob_fusion)
         # cv2.waitKey(0)
-        video_writer.add_frame(np.concatenate((ob, ob_fusion), axis=1))
+        global t_episode
+        if t_episode % 4 == 0:
+            video_writer.add_frame(np.concatenate((ob, ob_fusion), axis=1))
+
+        t_episode += 1
         if random.random() < 0.001:
             act = spc.sample()
         if verbose:
@@ -93,12 +98,15 @@ def play_one_episode(player, func, video_writer, verbose=False,
 
 class OfflinePredictor_WithViz(OfflinePredictor):
     def __init__(self, cfg, ob_shape, feature_map_name='feature_map',
-                 value_tensor_name='pred_value', input_size=84, sigma=0):
+                 value_tensor_name='pred_value', input_size=84, sigma=0,
+                 vis_method='vam'):
+        """vis_method can be 'vam' or 'pg'."""
         super(OfflinePredictor_WithViz, self).__init__(cfg)
 
         self.ob_shape = ob_shape
         self.input_size = input_size
         self.sigma = sigma
+        self.vis_method = vis_method
         with self.graph.as_default():
             self.feature_map_tensor, self.value_tensor = get_tensors_by_names(
                 [feature_map_name, value_tensor_name])
@@ -123,11 +131,18 @@ class OfflinePredictor_WithViz(OfflinePredictor):
         value = outputs[0]
         feature_map = outputs[1]
         outputs_res = outputs[2:]
-        # print('==========')
-        # print(value)
-        # print(feature_map.shape)
-        # print(outputs_res)
 
+        if self.vis_method == 'vam':
+            vis_maps = self.get_value_attention_maps(sess, value, feature_map)
+        elif self.vis_method == 'pg':
+            vis_maps = self.get_pixel_gradients_saliency_map(sess, feed)
+        else:
+            raise Exception('Unsupported visualization method: {}'.format(
+                self.vis_method))
+
+        return outputs_res, vis_maps
+
+    def get_value_attention_maps(self, sess, value, feature_map):
         value_attention_maps = []
         for v, fm in zip(value, feature_map):
             # get contribution of every hidden unit
@@ -158,7 +173,29 @@ class OfflinePredictor_WithViz(OfflinePredictor):
             vam = cv2.resize(vam, (self.ob_shape[1], self.ob_shape[0]))
             value_attention_maps.append(vam)
 
-        return outputs_res, np.array(value_attention_maps)
+        return np.array(value_attention_maps)
+
+    def get_pixel_gradients_saliency_map(self, sess, feed):
+        # get image input tensor
+        image_input_tensor = None
+        for t in self.input_tensors:
+            if 'state' in str(t.name):
+                image_input_tensor = t
+                break
+
+        pixel_grads_tensor = tf.gradients(self.value_tensor, image_input_tensor)
+        pixel_grads = sess.run(pixel_grads_tensor, feed_dict=feed)
+        saliency_map = pixel_grads[0][..., -3:]
+        saliency_map = normalize_activation(saliency_map)
+        saliency_map = np.asarray(saliency_map * 255, dtype=np.uint8)
+
+        vis_maps = []
+        for sm in saliency_map:
+            sm = cv2.applyColorMap(sm, cv2.COLORMAP_JET)
+            sm = cv2.resize(sm, (self.ob_shape[1], self.ob_shape[0]))
+            vis_maps.append(sm)
+
+        return np.array(vis_maps)
 
 
 class Model(ModelDesc):
@@ -195,12 +232,14 @@ class Model(ModelDesc):
         self.logits = tf.nn.softmax(policy, name='logits')
 
 
-def run_submission(cfg, output, nr):
+def run_submission(cfg, output, nr, vis_method):
     player, ob_shape = get_player(dumpdir=output, get_origin_ob_shape=True)
-    predfunc = OfflinePredictor_WithViz(cfg, ob_shape)
+    predfunc = OfflinePredictor_WithViz(cfg, ob_shape, vis_method=vis_method)
     logger.info("Start evaluation: ")
+    global t_episode
     for k in range(nr):
         if k != 0:
+            t_episode = 0
             player.restart_episode()
         vis_video = os.path.join(output, "ep_{}.mp4".format(k))
         video_writer = MovieWriter(vis_video, (ob_shape[1] * 2, ob_shape[0]), 8)
@@ -217,6 +256,8 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--episode', help='number of episodes to run',
                         type=int, default=20)
     parser.add_argument('--output', help='output directory', default='~/Video')
+    parser.add_argument('-v', '--vis-method', help='visualization method: vam, pg',
+                        default='vam')
     args = parser.parse_args()
 
     env=args.env
@@ -237,4 +278,4 @@ if __name__ == '__main__':
         session_init=SaverRestore(args.load),
         input_names=['state'],
         output_names=['logits'])
-    run_submission(cfg, args.output, args.episode)
+    run_submission(cfg, args.output, args.episode, args.vis_method)

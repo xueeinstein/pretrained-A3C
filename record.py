@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 import subprocess as pc
 
-EPISODES = 10
+EPISODES = 1
 NUM_GPUS = 8
+VIS='vam'
 LOAD_DIR = 'pretrained'
 VIDEO_DIR = '~/Video'
 
@@ -15,8 +16,8 @@ for g in games:
 
 gpu = 0
 for game in games:
-    cmd = ('examples/A3C-Gym/visualize-atari.py {} -g {} -e {} --load {} --output {}'
-           .format(game, gpu, EPISODES, LOAD_DIR, VIDEO_DIR))
+    cmd = ('examples/A3C-Gym/visualize-atari.py {} -g {} -e {} --load {} --output {} -v {}'
+           .format(game, gpu, EPISODES, LOAD_DIR, VIDEO_DIR, VIS))
     print('GPU', gpu, '>>>', cmd)
     pc.Popen(cmd, shell=True)
     gpu = (gpu + 1) % NUM_GPUS
